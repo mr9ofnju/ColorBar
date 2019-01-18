@@ -6,6 +6,7 @@ import android.util.Log;
 
 import java.util.BitSet;
 
+
 /**
  * 从相机,视频,图片识别二维码的基础类
  * 包含通用的UI通信显示方法,和图像处理方法等
@@ -54,18 +55,20 @@ public class MediaToFile{
         int intLength=32;
         int byteLength=8;
         int index=0;
-        for(int i=0;i<intLength;i++){
-            if(head.get(i)){
-                index|=1<<(intLength-i-1);
-            }
-        }
+//        for(int i=0;i<intLength;i++){
+//            if(head.get(i)){
+//                index|=1<<(intLength-i-1);
+//            }
+//        }
+        index = Utils.bitsToInt(head, intLength);
         int crcLength=8;
         int crc=0;
-        for(int i=0;i<byteLength;i++){
-            if(head.get(intLength+i)){
-                crc|=1<<(crcLength-i-1);
-            }
-        }
+//        for(int i=0;i<byteLength;i++){
+//            if(head.get(intLength+i)){
+//                crc|=1<<(crcLength-i-1);
+//            }
+//        }\
+        crc = Utils.bitsToInt(head, crcLength, intLength);
         crcCheck.reset();
         crcCheck.update(index);
         int truth=(int)crcCheck.getValue();
