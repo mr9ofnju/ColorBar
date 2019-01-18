@@ -440,7 +440,7 @@ public class solvePicture {
      * @return
      */
 
-    public BitSet getHead(){
+    public BitSet getHead(){//低位在前面
         BitSet bitSet=new BitSet();
         int length = 40;//临时改成28位
         int left = this.MixBorderLeft  + this.BlackBorderLenght;
