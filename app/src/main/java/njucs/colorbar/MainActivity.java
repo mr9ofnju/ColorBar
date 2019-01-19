@@ -1,17 +1,24 @@
 package njucs.colorbar;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
@@ -34,6 +41,13 @@ public class MainActivity extends Activity {
     protected static final String TAG = "Main";
 
     solvePicture solve;
+
+    private static final int REQUEST_EXTERNAL_STORAGE = 1;
+    private static String[] PERMISSIONS_STORAGE = {
+            "android.permission.READ_EXTERNAL_STORAGE",
+            "android.permission.WRITE_EXTERNAL_STORAGE" };
+
+
 
     private static Context mContext;
 
@@ -80,7 +94,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        verifyStoragePermissions(this);
         mContext=this;
 
         TextView debugView = (TextView) findViewById(R.id.debug_view);
@@ -175,6 +189,20 @@ public class MainActivity extends Activity {
     }*/
 
 
+    public static void verifyStoragePermissions(Activity activity) {//获得文件访问权限
+
+        try {
+            //检测是否有写的权限
+            int permission = ActivityCompat.checkSelfPermission(activity,
+                    "android.permission.WRITE_EXTERNAL_STORAGE");
+            if (permission != PackageManager.PERMISSION_GRANTED) {
+                // 没有写的权限，去申请写的权限，会弹出对话框
+                ActivityCompat.requestPermissions(activity, PERMISSIONS_STORAGE,REQUEST_EXTERNAL_STORAGE);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     public static Context getContext(){
         return mContext;
@@ -224,9 +252,12 @@ public class MainActivity extends Activity {
         String path = "";
         switch (requestCode){
             case REQUEST_CODE_FILE_PATH_INPUT:
+                Uri uri;
                 id = R.id.file_path_input;
-                if( data != null)
-                    path = data.getData().getPath();//这里是转换媒体的内部路径和绝对路径
+                if(null != data)
+                    path = getRealFilePath(this,data.getData());
+
+                    //path = data.getData().getPath();//这里是转换媒体的内部路径和绝对路径
                 /*if(path.contains("external")){
                     String[] proj = {MediaStore.Images.Media.DATA};
                     //好像是Android多媒体数据库的封装接口，具体的看Android文档
@@ -237,9 +268,9 @@ public class MainActivity extends Activity {
                     cursor.moveToFirst();
                     //最后根据索引值获取图片路径
                     path = cursor.getString(column_index);
-                }else*/ if(path.contains(":")){//三星手机处理
+                }else if(path.contains(":")){//三星手机处理
                     path =  Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + path.split(":")[1];
-                }
+                }*/
 
                 break;
             case REQUEST_CODE_FILE_PATH_TRUTH:
@@ -252,6 +283,116 @@ public class MainActivity extends Activity {
             editText.setText(path);
         }
     }
+
+    public String getRealFilePath( final Context context, final Uri uri ) {
+        if ( null == uri ) return null;
+        final String scheme = uri.getScheme();
+        String data = null;
+        if ( scheme == null )
+            data = uri.getPath();
+        else if ( ContentResolver.SCHEME_FILE.equals( scheme ) ) {
+            data = uri.getPath();
+        } else if ( ContentResolver.SCHEME_CONTENT.equals( scheme ) ) {
+            Cursor cursor = context.getContentResolver().query( uri, new String[] { MediaStore.Images.ImageColumns.DATA }, null, null, null );
+            if ( null != cursor ) {
+                if ( cursor.moveToFirst() ) {
+                    int index = cursor.getColumnIndex( MediaStore.Images.ImageColumns.DATA );
+                    if ( index > -1 ) {
+                        data = cursor.getString( index );
+                    }
+                }
+                cursor.close();
+            }
+        }
+        return data;
+    }
+
+    /**
+     * 适配api19以下(不包括api19),根据uri获取图片的绝对路径
+     *
+     * @param context 上下文对象
+     * @param uri     图片的Uri
+     * @return 如果Uri对应的图片存在, 那么返回该图片的绝对路径, 否则返回null
+     */
+    private String getRealPathFromUriBelowAPI19(Context context, Uri uri) {
+        return getDataColumn(context, uri, null, null);
+    }
+
+    /**
+     * 适配api19及以上,根据uri获取图片的绝对路径
+     *
+     * @param context 上下文对象
+     * @param uri     图片的Uri
+     * @return 如果Uri对应的图片存在, 那么返回该图片的绝对路径, 否则返回null
+     */
+    @SuppressLint("NewApi")
+    private String getRealPathFromUriAboveApi19(Context context, Uri uri) {
+        String filePath = null;
+        if (DocumentsContract.isDocumentUri(context, uri)) {
+            // 如果是document类型的 uri, 则通过document id来进行处理
+            String documentId = DocumentsContract.getDocumentId(uri);
+            if (isMediaDocument(uri)) { // MediaProvider
+                // 使用':'分割
+                String id = documentId.split(":")[1];
+
+                String selection = MediaStore.Images.Media._ID + "=?";
+                String[] selectionArgs = {id};
+                filePath = getDataColumn(context, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, selection, selectionArgs);
+            } else if (isDownloadsDocument(uri)) { // DownloadsProvider
+                Uri contentUri = ContentUris.withAppendedId(Uri.parse("content://downloads/public_downloads"), Long.valueOf(documentId));
+                filePath = getDataColumn(context, contentUri, null, null);
+            }
+        } else if ("content".equalsIgnoreCase(uri.getScheme())){
+            // 如果是 content 类型的 Uri
+            filePath = getDataColumn(context, uri, null, null);
+        } else if ("file".equals(uri.getScheme())) {
+            // 如果是 file 类型的 Uri,直接获取图片对应的路径
+            filePath = uri.getPath();
+        }
+        return filePath;
+    }
+
+    /**
+     * 获取数据库表中的 _data 列，即返回Uri对应的文件路径
+     * @return
+     */
+    private String getDataColumn(Context context, Uri uri, String selection, String[] selectionArgs) {
+        String path = null;
+
+        String[] projection = new String[]{MediaStore.Images.Media.DATA};
+        Cursor cursor = null;
+        try {
+            cursor = context.getContentResolver().query(uri, projection, selection, selectionArgs, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int columnIndex = cursor.getColumnIndexOrThrow(projection[0]);
+                path = cursor.getString(columnIndex);
+            }
+        } catch (Exception e) {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return path;
+    }
+
+    /**
+     * @param uri the Uri to check
+     * @return Whether the Uri authority is MediaProvider
+     */
+    private boolean isMediaDocument(Uri uri) {
+        return "com.android.providers.media.documents".equals(uri.getAuthority());
+    }
+
+    /**
+     * @param uri the Uri to check
+     * @return Whether the Uri authority is DownloadsProvider
+     */
+    private boolean isDownloadsDocument(Uri uri) {
+        return "com.android.providers.downloads.documents".equals(uri.getAuthority());
+    }
+
+
+
 
     /**
      * 处理视频文件,从视频帧识别二维码
