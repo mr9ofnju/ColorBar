@@ -3,6 +3,7 @@ package njucs.colorbar;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Environment;
+import android.support.v4.app.NotificationCompatSideChannelService;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -34,7 +35,7 @@ public class solvePicture {
     protected  int imgWidth;//图片宽度
     protected  int imgHeight;//图片高度
 
-    protected int bitsPerBlock = 2 ;//每个小方块的bit数
+    protected int bitsPerBlock = 1 ;//每个小方块的bit数
     protected int deltaNum = (int)(Math.pow(2.0,bitsPerBlock )) ;//变化的数目
 
 
@@ -42,11 +43,11 @@ public class solvePicture {
     protected PerspectiveTransform transform;//透视变换参数
     protected int BlackBorderLenght = 1;//第二层黑色边界
     protected int mixBorderLength = 1;//调色板的边界
-    protected int MixBorderLeft = 8;//左边的参考色
+    protected int MixBorderLeft = 1;//左边的参考色
 
 
     protected int contentWidth = 60;//内容宽度
-    protected  int contentHeight = 50;//内容高度
+    protected  int contentHeight = 60;//内容高度
 
     protected Point [][] points;
     protected int[][]refeColor = null;//每行的参考点颜色
@@ -94,10 +95,10 @@ public class solvePicture {
     }
 
     protected int getBarCodeWidth(){
-        return BlackBorderLenght * 2 + mixBorderLength + MixBorderLeft + contentWidth;
+        return BlackBorderLenght * 2 + MixBorderLeft + contentWidth;
     }
     protected int getBarCodeHeight(){
-        return BlackBorderLenght  * 2 + 2*mixBorderLength + contentHeight;
+        return BlackBorderLenght  * 2 + mixBorderLength + contentHeight;
     }
 
 
@@ -314,36 +315,38 @@ public class solvePicture {
     }
 
 
-    public BitSet  getContent(){
+    public BitSet  getContent(){//获得数据的值
 
         StringBuffer buffer = new StringBuffer();
         BitSet content = new BitSet();
         int index = 0;
         int left = MixBorderLeft + BlackBorderLenght ;
-        for(int i = 2;i < this.contentHeight + 2; i++){
-            int [][]original = getRefeColor(i);
+        int top = mixBorderLength + BlackBorderLenght;
+        for(int i = top;i < this.contentHeight + top; i++){
+            //int [][]original = getRefeColor(i);
             //int [][]compare = clusterGetRefeColor(i);
             for(int j = left;j<this.contentWidth + left;j++) {
-                int []yuv = getYUV(i,j);
-                buffer.append(yuv[0]+","+ yuv[1]+ ","+yuv[2]+"\t");
+                //int []yuv = getYUV(i,j);
+                //buffer.append(yuv[0]+","+ yuv[1]+ ","+yuv[2]+"\t");
                 int realx = points[i][j].getX();
                 int realy = points[i][j].getY();
-                int colorType = getStr(i, j, original);
+                System.out.print(realx + " " + realy);
+                int colorType = getColorType(i,j);
                 //buffer.append(colorType+",");
                 //int colorType = points[i][j].category;
                 switch (colorType % this.deltaNum) {
                     case 0:
                         break;
                     case 1:
-                        content.set(index + 1);
+                        content.set(index);
                         break;
-                    case 2:
-                        content.set(index );
-                        break;
-                    case 3:
-                        content.set(index );
-                        content.set(index + 1);
-                        break;
+//                    case 2:
+//                        content.set(index );
+//                        break;
+//                    case 3:
+//                        content.set(index );
+//                        content.set(index + 1);
+//                        break;
                     /*case 4:
                         content.set(index);
                         break;
@@ -365,7 +368,7 @@ public class solvePicture {
             }
             buffer.append("\n");
         }
-        File file = new File(Environment.getExternalStorageDirectory(),"abc/test/compare/"+countIndex+".txt");
+       /* File file = new File(Environment.getExternalStorageDirectory(),"abc/test/compare/"+countIndex+".txt");
         OutputStream os;
         try {
             os = new FileOutputStream(file);
@@ -377,10 +380,21 @@ public class solvePicture {
         }catch (IOException e){
             Log.i(TAG, "IOException:" + e.toString());
             //return false;
-        }
+        }*/
         countIndex++;
         return content;
 
+    }
+
+    /**
+    获得颜色对应的值
+     */
+    public int getColorType(int x, int y){
+        int []yuv = getYUV(x,y);
+        if(yuv[RawImage.CHANNLE_U] < 150 | yuv[RawImage.CHANNLE_V] < 150)
+            return 0;
+        else
+            return 1;
     }
 
     /**

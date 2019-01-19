@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class StreamToFile extends MediaToFile implements ProcessFrame.FrameCallback{
     private static final String TAG = "StreamToFile";//log tag
-    private static final boolean VERBOSE = false;//是否记录详细log
+    private static final boolean VERBOSE = true;//是否记录详细log
     private static final long QUEUE_WAIT_SECONDS = 4;
     private Handler processHandler;
     protected boolean onDecodeFlag = true;//判断是否继续解码

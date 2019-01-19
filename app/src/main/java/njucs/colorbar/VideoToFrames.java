@@ -23,9 +23,9 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 public class VideoToFrames implements Runnable {
     private static final String TAG = "VideoToFrames";
-    private static final boolean VERBOSE = false;
+    private static final boolean VERBOSE = true;
     private static final long DEFAULT_TIMEOUT_US = 10000;
-    private  static final boolean save = true;//是否保存
+    private  static final boolean save = false;//是否保存
 
     private static final int COLOR_FormatI420 = 1;
     private static final int COLOR_FormatNV21 = 2;
@@ -59,7 +59,7 @@ public class VideoToFrames implements Runnable {
         outputImageFormat = imageFormat;
         File theDir = new File(dir);
         if (!theDir.exists()) {
-            theDir.mkdirs();
+             theDir.mkdirs();
         } else if (!theDir.isDirectory()) {
             throw new IOException("Not a directory");
         }
